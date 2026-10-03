@@ -24,11 +24,11 @@
 *****************************************************************************************
 '''
 
-# Team ID:          < Team-ID >
-# Author List:      < Names of the team members who worked on this file, comma separated >
+# Team ID:          NV_6142
+# Author List:      Pathikrit Roy Choudhury, Suyash Maurya
 # Filename:         lane_detection.py
 # Functions:        detect_lane
-# Global variables: < List any global variables you add, "None" if you add none >
+# Global variables: None
 
 
 ####################### IMPORT MODULES #######################
@@ -50,6 +50,8 @@ VALID_LANES = (LANE_LEFT, LANE_RIGHT, LANE_UNKNOWN)
 ##############################################################
 ############### ADD YOUR IMPLEMENTATION HERE #################
 ##############################################################
+
+
 
 def detect_lane(frame):
     '''
@@ -106,6 +108,8 @@ def detect_lane(frame):
     # 3. Compute the x-pixel of the lane centre   ->  center_x
     # 4. Decide which lane the vehicle is in      ->  lane
     ############################################################
+    global prev_lane, prev_center_x
+
     hls = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
 
     lower_white= np.array([0,200,0], dtype=np.uint8)
@@ -123,7 +127,7 @@ def detect_lane(frame):
         [300, 130],  # top-left
         [450, 130],  # top-right
         [640, 200],  # The extra anchor point to catch the right yellow line
-        [640, 420]   #  bottom-right
+        [640, 420]   # bottom-right
     ]], dtype=np.int32)
 
   
@@ -160,25 +164,35 @@ def detect_lane(frame):
     left_mass = np.sum(histogram[max(0, left_x - 30) : min(midpoint, left_x + 30)])
     right_mass = np.sum(histogram[max(midpoint, right_x - 30) : min(640, right_x + 30)])
 
-    if left_mass <3000 and right_mass <3000:
-        center_x = -1
-        lane=VALID_LANES[2]
+    if left_mass < 3000 and right_mass < 3000:
+       return {"center_x": prev_center_x, "lane": prev_lane}
 
     if left_mass>right_mass:
+        center_x_warped=left_x+170
+
+    else: 
+        center_x_warped=right_x-170
+
+    warped_point=np.array([[[center_x_warped, 360]]], dtype=np.float32)
+    original_point=cv2.perspectiveTransform(warped_point, Minv)
+    current_center_x = (original_point[0][0][0])
+
+    center_x = int((0.5*current_center_x) + (0.5*prev_center_x))
+
+    yellow_left = np.sum(yellow_mask[240:, :200])
+    yellow_right = np.sum(yellow_mask[240:, 440:])
+
+    if yellow_left > 2000 and yellow_left > yellow_right * 1.1:
         lane = VALID_LANES[0]
 
-        center_x_warped = left_x + 170
+    elif yellow_right > 2000 and yellow_right > yellow_left * 1.1:
+        lane=VALID_LANES[1]
 
     else:
-        lane=VALID_LANES[1]
-        center_x_warped = right_x - 170
+        lane=prev_lane
 
 
-    warped_point=np.array([[[center_x_warped, 480]]], dtype=np.float32)
-    original_point=cv2.perspectiveTransform(warped_point, Minv)
-    center_x = int(original_point[0][0][0])
-
-
+    prev_lane, prev_center_x = lane, center_x
     return {"center_x": center_x, "lane": lane}
 
 
@@ -189,6 +203,8 @@ def detect_lane(frame):
 # ever calls that one function. List them in the file header too.
 # ------------------------------------------------------------------
 
+prev_lane = 'left'
+prev_center_x = 320
 
 ##############################################################
 ################ END OF YOUR IMPLEMENTATION ##################
